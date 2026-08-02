@@ -1,0 +1,1469 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ToStylMou API",
+    "description": "Full API documentation for Auth, Post, and User routes",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3002/api/v1",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "api-key",
+        "description": "API key required for all endpoints"
+      },
+      "BearerTokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "token",
+        "description": "JWT token required for protected endpoints"
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer", "example": 200 },
+          "flag": { "type": "integer", "example": 1, "description": "1=success, 0=error, 3=not found, 4=pending profile" },
+          "message": { "type": "string" },
+          "data": { "type": "object" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer", "example": 400 },
+          "flag": { "type": "integer", "example": 0 },
+          "message": { "type": "string", "example": "Validation Error" },
+          "data": { "type": "object" }
+        }
+      },
+      "UserData": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "full_name": { "type": "string" },
+          "dob": { "type": "string" },
+          "country_code": { "type": "string" },
+          "phone": { "type": "string" },
+          "profile_photo_path": { "type": "string" },
+          "is_active": { "type": "integer" },
+          "is_delete": { "type": "integer" },
+          "completed_step": { "type": "integer" }
+        }
+      },
+      "PostData": {
+        "type": "object",
+        "properties": {
+          "post_id": { "type": "integer" },
+          "user_id": { "type": "integer" },
+          "username": { "type": "string" },
+          "profile_photo_path": { "type": "string" },
+          "post_type": { "type": "string", "enum": ["M", "V", "C"], "description": "M=Media, V=Video, C=Compare" },
+          "ranking_expired_on": { "type": "string", "format": "date-time" },
+          "cat_id": { "type": "integer" },
+          "name": { "type": "string" },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "m_id": { "type": "integer" },
+                "type": { "type": "string" },
+                "url": { "type": "string" }
+              }
+            }
+          },
+          "ranking_total": { "type": "integer" },
+          "rating_total": { "type": "integer" },
+          "rating_avg": { "type": "number" }
+        }
+      },
+      "OtpData": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "user_id": { "type": "integer" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "otp": { "type": "string" },
+          "type": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "expired_on": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Joi validation failed for request body",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "status": 400,
+              "flag": 0,
+              "message": "\"username\" is required",
+              "data": {}
+            }
+          }
+        }
+      },
+      "UnauthorizedApi": {
+        "description": "Missing or invalid API key",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "status": 401,
+              "flag": 0,
+              "message": "Invalid API Key",
+              "data": {}
+            }
+          }
+        }
+      },
+      "UnauthorizedToken": {
+        "description": "Missing or invalid Bearer token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "status": 401,
+              "flag": 0,
+              "message": "Unauthorized: Token missing or invalid",
+              "data": {}
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "status": 500,
+              "flag": 0,
+              "message": "Internal Server Error",
+              "data": {}
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "paths": {
+
+    "/auth/signup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "description": "Creates a new user account. Returns user data with `flag: 4` (profile setup pending) on success.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "email", "country_code", "mobile_number", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "amit_sharma" },
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" },
+                  "country_code": { "type": "string", "example": "+91" },
+                  "mobile_number": { "type": "string", "example": "9876543210" },
+                  "password": { "type": "string", "format": "password", "example": "Secret@123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully — profile setup pending (flag: 4)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "status": 201,
+                  "flag": 4,
+                  "message": "Profile Set Up Pending",
+                  "data": { "userData": { "id": 1, "username": "amit_sharma", "email": "amit_sharma@example.com" } }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Conflict — username, email, or phone already exists (flag: 0)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "username_exists": { "value": { "status": 200, "flag": 0, "message": "Username Already Exist", "data": {} } },
+                  "email_exists": { "value": { "status": 200, "flag": 0, "message": "Email Already Exist", "data": {} } },
+                  "phone_exists": { "value": { "status": 200, "flag": 0, "message": "Phone Already Exist", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/profileSetUp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Complete profile setup after signup",
+        "description": "Sets up user profile (full name, DOB, device info) and returns a JWT token on success.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "full_name", "dob", "device_type", "device_name", "device_model", "os_version", "ip"],
+                "properties": {
+                  "user_id": { "type": "integer", "example": 1 },
+                  "full_name": { "type": "string", "example": "Amit Sharma" },
+                  "dob": { "type": "string", "example": "1995-06-15" },
+                  "device_type": { "type": "string", "example": "A" },
+                  "device_name": { "type": "string", "example": "Samsung Galaxy S21" },
+                  "device_model": { "type": "string", "example": "SM-G991B" },
+                  "os_version": { "type": "string", "example": "13" },
+                  "ip": { "type": "string", "example": "192.168.1.1" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile setup result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "Sign Up Successfull",
+                      "data": { "userData": {}, "token": "Bearer eyJhbGc..." }
+                    }
+                  },
+                  "already_done": {
+                    "value": { "status": 200, "flag": 1, "message": "User Already Completed The Setup Steps", "data": {} }
+                  },
+                  "user_not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} }
+                  },
+                  "device_error": {
+                    "value": { "status": 200, "flag": 0, "message": "Error While Adding Device Data", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login with username and password",
+        "description": "Authenticates a user. Returns JWT token on success. Returns `flag: 4` if profile setup is still pending.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password", "device_type", "device_name", "device_model", "os_version", "ip"],
+                "properties": {
+                  "username": { "type": "string", "example": "amit_sharma" },
+                  "password": { "type": "string", "format": "password", "example": "Secret@123" },
+                  "device_type": { "type": "string", "example": "A" },
+                  "device_name": { "type": "string", "example": "Samsung Galaxy S21" },
+                  "device_model": { "type": "string", "example": "SM-G991B" },
+                  "os_version": { "type": "string", "example": "13" },
+                  "ip": { "type": "string", "example": "192.168.1.1" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "Login Success",
+                      "data": { "userData": {}, "token": "Bearer eyJhbGc..." }
+                    }
+                  },
+                  "pending_setup": {
+                    "value": { "status": 200, "flag": 4, "message": "Pending Profile Setup", "data": { "userData": {}, "token": "" } }
+                  },
+                  "user_locked": {
+                    "value": { "status": 200, "flag": 0, "message": "User Locked", "data": {} }
+                  },
+                  "user_not_exist": {
+                    "value": { "status": 200, "flag": 3, "message": "User Not Exist", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/forgotPassword": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Send OTP for forgot password",
+        "description": "Sends an OTP to the user's email or phone. Pass either `email` OR `country_code + phone`.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" },
+                  "country_code": { "type": "string", "example": "+91" },
+                  "phone": { "type": "string", "example": "9876543210" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Forgot password OTP result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "otp_sent": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "OTP Sent",
+                      "data": { "otpData": { "id": 5, "otp": "123123", "expired_on": "2025-01-01T12:05:00Z" } }
+                    }
+                  },
+                  "user_not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} }
+                  },
+                  "wait_error": {
+                    "value": { "status": 200, "flag": 0, "message": "Please Wait 1 Minutes", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty body or validation error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 0, "message": "Email or Phone Number Required", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/sendOtp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Resend OTP",
+        "description": "Resends OTP to the user via email or phone.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string", "example": "+919876543210" },
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP resend result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "New Otp Sent",
+                      "data": { "otpData": {} }
+                    }
+                  },
+                  "not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "Phone Number or Email Not Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email or Phone missing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 0, "message": "Email or Phone Required", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/verifyOtp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify OTP",
+        "description": "Verifies the OTP sent to user's email or phone",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["otp"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" },
+                  "phone": { "type": "string", "example": "+919876543210" },
+                  "otp": { "type": "string", "example": "123123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verification result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "verified": {
+                    "value": { "status": 200, "flag": 5, "message": "User Otp Verified", "data": {} }
+                  },
+                  "invalid_otp": {
+                    "value": { "status": 200, "flag": 0, "message": "OTP Invalid", "data": {} }
+                  },
+                  "expired_otp": {
+                    "value": { "status": 200, "flag": 0, "message": "OTP Expired", "data": {} }
+                  },
+                  "no_otp_found": {
+                    "value": { "status": 200, "flag": 3, "message": "No OTP Data Found", "data": {} }
+                  },
+                  "phone_not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "Phone Number Or Email Not Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/updatePassword": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Update password after OTP verification",
+        "description": "Updates user password using user ID (used after successful OTP verify in forgot password flow).",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["id", "newPassword"],
+                "properties": {
+                  "id": { "type": "integer", "example": 1 },
+                  "newPassword": { "type": "string", "format": "password", "example": "NewPass@456" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password update result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": { "status": 200, "flag": 1, "message": "Password Updated Successfully", "data": { "userData": {} } }
+                  },
+                  "user_not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} }
+                  },
+                  "failed": {
+                    "value": { "status": 200, "flag": 0, "message": "Password Update Failed", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/changePassword": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Change password (authenticated)",
+        "description": "Allows a logged-in user to change their password by providing the old and new password.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["oldPass", "newPass"],
+                "properties": {
+                  "oldPass": { "type": "string", "format": "password", "example": "OldPass@123" },
+                  "newPass": { "type": "string", "format": "password", "example": "NewPass@456" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Change password result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": { "status": 200, "flag": 1, "message": "Password Changed Successfully", "data": { "userData": {} } }
+                  },
+                  "wrong_old_pass": {
+                    "value": { "status": 200, "flag": 0, "message": "Old Password Does Not Match", "data": {} }
+                  },
+                  "user_not_found": {
+                    "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedApi" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/auth/logout": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Logout user",
+        "description": "Logs out the user by deleting their device token from the database.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": { "status": 200, "flag": 0, "message": "Logout Successfull", "data": {} }
+              }
+            }
+          },
+          "401": {
+            "description": "Token missing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 401, "message": "Token missing" }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/home": {
+      "get": {
+        "tags": ["Post"],
+        "summary": "Get homepage feed",
+        "description": "Returns trending posts, post feed (new/following/expiring), category list, and category-filtered posts. All data is paginated via query params.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "parameters": [
+          { "name": "post", "in": "query", "schema": { "type": "string", "enum": ["new", "following", "expiring"], "default": "new" }, "description": "Feed type filter" },
+          { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["M", "V", "C"] }, "description": "Post media type filter (not applicable for 'expiring')" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated category IDs to filter posts" },
+          { "name": "pageTrending", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limitTrending", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "pagePost", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limitPost", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "pageCategory", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limitCategory", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Homepage data fetched",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "status": 200, "flag": 1, "message": "Homepage Posts Fetch Successfully",
+                  "data": {
+                    "trendingPost": [],
+                    "postData": [],
+                    "categoryData": [],
+                    "categoryPostData": []
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid post or type param",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "invalid_post": { "value": { "status": 400, "flag": 0, "message": "Invalid Request For Post", "data": {} } },
+                  "invalid_type": { "value": { "status": 400, "flag": 0, "message": "Invalid Request For Post Type Either M,V or C", "data": {} } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/categoryList": {
+      "get": {
+        "tags": ["Post"],
+        "summary": "Get all categories",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Category list result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "Category Data Fetch Successfully",
+                      "data": { "categoryData": [{ "id": 1, "name": "Sports" }] }
+                    }
+                  },
+                  "no_data": {
+                    "value": { "status": 200, "flag": 3, "message": "No Category Data Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/categoryPostList": {
+      "get": {
+        "tags": ["Post"],
+        "summary": "Get posts by category",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "schema": { "type": "integer" }, "description": "Category ID" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category post list result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": { "status": 200, "flag": 1, "message": "Category Post Data Fetch Successfully", "data": { "categoryData": [] } }
+                  },
+                  "no_data": {
+                    "value": { "status": 200, "flag": 3, "message": "No Category Data Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing id param",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 0, "message": "Pass Id In Query String", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/postDetails/{id}": {
+      "get": {
+        "tags": ["Post"],
+        "summary": "Get post details by ID",
+        "description": "Returns full post details including media, comments count, save status, rating, ranking (if expired), and more.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Post ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post details result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "Post Data Fetch Successfully",
+                      "data": { "postData": [{ "post_id": 1, "ranking": null, "comment_total": 5, "is_saved": 0 }] }
+                    }
+                  },
+                  "no_data": { "value": { "status": 200, "flag": 3, "message": "No Post Data Found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing param or user data",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 0, "message": "Pass Id In Parameters", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/createPost": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Create a new post",
+        "description": "Creates a post with media. `post_type` must be one of: `M` (Media), `V` (Video), `C` (Compare). `ranking_expired_on` is required only for Compare posts.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["description", "cat_id", "post_type", "media"],
+                "properties": {
+                  "description": { "type": "string", "example": "Check out this comparison!" },
+                  "cat_id": { "type": "integer", "example": 2 },
+                  "post_type": { "type": "string", "enum": ["M", "V", "C"], "example": "C" },
+                  "ranking_expired_on": { "type": "string", "format": "date-time", "example": "2025-02-01T00:00:00Z" },
+                  "media": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["media_type", "media_url"],
+                      "properties": {
+                        "media_type": { "type": "string", "example": "image" },
+                        "media_url": { "type": "string", "example": "https://cdn.example.com/img1.jpg" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post creation result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": { "status": 200, "flag": 1, "message": "Post Created Successfully", "data": { "postData": {} } }
+                  },
+                  "error": {
+                    "value": { "status": 200, "flag": 0, "message": "Error While Creating Post", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/deletePost": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Delete a post",
+        "description": "Soft-deletes a post and its associated media. Only the post owner can delete.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 5 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delete post result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Post Deleted Successfully", "data": {} } },
+                  "not_found": { "value": { "status": 200, "flag": 0, "message": "Post Not Found Or Not Belongs To You", "data": {} } },
+                  "error": { "value": { "status": 200, "flag": 0, "message": "Error While Deleting Post", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/addRanking": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Add ranking to a Compare post",
+        "description": "Submits a ranking for all media items in a `C` type post. Ranks must be sequential (1→N), unique, and complete (all media must be ranked).",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id", "ranking"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 3 },
+                  "ranking": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["m_id", "rank"],
+                      "properties": {
+                        "m_id": { "type": "integer", "example": 10 },
+                        "rank": { "type": "integer", "example": 1 }
+                      }
+                    },
+                    "example": [{ "m_id": 10, "rank": 1 }, { "m_id": 11, "rank": 2 }]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranking result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Ranking Added Successfull", "data": {} } },
+                  "already_ranked": { "value": { "status": 200, "flag": 0, "message": "You Already Ranked This Post", "data": {} } },
+                  "post_not_found": { "value": { "status": 200, "flag": 3, "message": "Post not found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or business logic error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "wrong_type": { "value": { "status": 400, "flag": 0, "message": "Post Type Is Not Compare", "data": {} } },
+                  "expired": { "value": { "status": 400, "flag": 0, "message": "Ranking expired for this post", "data": {} } },
+                  "incomplete": { "value": { "status": 400, "flag": 0, "message": "You must rank all media of this post", "data": {} } },
+                  "duplicate_rank": { "value": { "status": 400, "flag": 0, "message": "Duplicate rank found", "data": {} } },
+                  "non_sequential": { "value": { "status": 400, "flag": 0, "message": "Ranks must be sequential starting from 1", "data": {} } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/addRating": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Add rating to a post",
+        "description": "Adds a numeric rating to a non-Compare post. Each user can rate a post only once.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id", "rating"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 4 },
+                  "rating": { "type": "number", "example": 4.5 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rating result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Rating Added Successfully", "data": {} } },
+                  "already_rated": { "value": { "status": 200, "flag": 0, "message": "You Already Ranked This Post", "data": {} } },
+                  "post_not_found": { "value": { "status": 200, "flag": 3, "message": "Post not found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Compare post cannot be rated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 0, "message": "Post Type Is Compare Which Does Not Contain Rating", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/addComment": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Add a comment to a post",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id", "comment_text"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 4 },
+                  "comment_text": { "type": "string", "example": "Great post!" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comment result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Post Comment Successfully", "data": {} } },
+                  "post_not_found": { "value": { "status": 200, "flag": 3, "message": "Post not found", "data": {} } },
+                  "error": { "value": { "status": 200, "flag": 0, "message": "Error While Inserting Comment", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/saveUnsavePost": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Toggle save/unsave a post",
+        "description": "Saves a post if not saved. Unsaves (soft-deletes) if already saved.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 4 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Save/Unsave result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "saved": { "value": { "status": 200, "flag": 1, "message": "Post Saved Successfully", "data": {} } },
+                  "unsaved": { "value": { "status": 200, "flag": 1, "message": "Saved Post Deleted Successfully", "data": {} } },
+                  "post_not_found": { "value": { "status": 200, "flag": 3, "message": "Post not found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/post/reportPost": {
+      "post": {
+        "tags": ["Post"],
+        "summary": "Report a post",
+        "description": "Reports a post with a reason. Multiple reports are allowed but same reason from same user is blocked.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["post_id", "report_text"],
+                "properties": {
+                  "post_id": { "type": "integer", "example": 4 },
+                  "report_text": { "type": "string", "example": "This post contains inappropriate content." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Post Reported Successfully", "data": {} } },
+                  "duplicate": { "value": { "status": 200, "flag": 0, "message": "Post Already Reported With The Same Reason", "data": {} } },
+                  "post_not_found": { "value": { "status": 200, "flag": 3, "message": "Post not found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/getUserProfile": {
+      "get": {
+        "tags": ["User"],
+        "summary": "Get user profile",
+        "description": "Returns profile data and posts. If `user_id` matches the logged-in user, returns own profile. Otherwise returns the visitor's view with `is_followed` flag.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "parameters": [
+          { "name": "user_id", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "ID of the user to fetch" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile fetch result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "status": 200, "flag": 1, "message": "User Profile Fetch Successfull",
+                      "data": { "userData": [], "postData": [] }
+                    }
+                  },
+                  "error": { "value": { "status": 200, "flag": 0, "message": "Error Fetching User Profile", "data": {} } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/followUnfollowUser": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Follow or unfollow a user",
+        "description": "Toggles follow status. If already following, unfollows. If not following, follows.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["other_user_id"],
+                "properties": {
+                  "other_user_id": { "type": "integer", "example": 7 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Follow/Unfollow result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "followed": { "value": { "status": 200, "flag": 1, "message": "User followed Succesfully", "data": {} } },
+                  "unfollowed": { "value": { "status": 200, "flag": 1, "message": "User Unfollowed Succesfully", "data": {} } },
+                  "user_not_found": { "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/updateProfile": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Update user profile",
+        "description": "Updates one or more profile fields. All fields are optional. `country_code` and `phone` must both be provided together.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_name": { "type": "string", "example": "Amit Sharma" },
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" },
+                  "username": { "type": "string", "example": "amit" },
+                  "country_code": { "type": "string", "example": "+91" },
+                  "phone": { "type": "number", "example": 9876543210 },
+                  "profile_photo": { "type": "string", "example": "https://cdn.example.com/photo.jpg" },
+                  "dob": { "type": "string", "format": "date", "example": "1995-06-15" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "status": 200, "flag": 0, "message": "User Profile Updated Successfully",
+                  "data": { "userData": {} }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No fields to update or validation error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "status": 400, "flag": 2, "message": "No Fields To Update", "data": {} }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/userSavePostList": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Get saved posts of logged-in user",
+        "description": "Returns paginated list of posts saved by the authenticated user.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "example": 1 },
+                  "size": { "type": "integer", "example": 10 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved posts result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": {
+                    "value": { "status": 200, "flag": 1, "message": "Saved Post Data Fetch Successfull", "data": { "savedPostData": [] } }
+                  },
+                  "no_data": {
+                    "value": { "status": 200, "flag": 3, "message": "No Saved Post Data Found", "data": {} }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/followerList": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Get follower list of a user",
+        "description": "Returns list of followers. If viewing another user's followers, includes `is_following` flag to indicate if the logged-in user follows each follower.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id"],
+                "properties": {
+                  "user_id": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Followers list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "status": 200, "flag": 0, "message": "Followers List Fetched Successfully",
+                  "data": { "followersData": [{ "id": 1, "username": "jane", "profile_photo_path": "", "is_following": 1 }] }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No followers found or user not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "no_followers": { "value": { "status": 400, "flag": 3, "message": "No Followers Found", "data": {} } },
+                  "user_not_found": { "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/followingList": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Get following list of a user",
+        "description": "Returns list of users the given user is following. If viewing another user's list, includes `is_follower` flag.",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id"],
+                "properties": {
+                  "user_id": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Following list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "status": 200, "flag": 0, "message": "Followers List Fetched Successfully",
+                  "data": { "followersData": [{ "id": 1, "username": "mike", "profile_photo_path": "", "is_follower": 0 }] }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No followings found or user not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "no_followings": { "value": { "status": 400, "flag": 3, "message": "No Followings Found", "data": {} } },
+                  "user_not_found": { "value": { "status": 200, "flag": 3, "message": "User Not Found", "data": {} } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+
+    "/user/contactUs": {
+      "post": {
+        "tags": ["User"],
+        "summary": "Submit a contact us form",
+        "security": [{ "ApiKeyAuth": [] }, { "BearerTokenAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["full_name", "email", "subject", "description"],
+                "properties": {
+                  "full_name": { "type": "string", "example": "Amit Sharma" },
+                  "email": { "type": "string", "format": "email", "example": "amit_sharma@example.com" },
+                  "subject": { "type": "string", "example": "Issue with login" },
+                  "description": { "type": "string", "example": "I am unable to login since yesterday." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact Us result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "examples": {
+                  "success": { "value": { "status": 200, "flag": 1, "message": "Contact Us Data Submitted Successfully", "data": {} } },
+                  "error": { "value": { "status": 200, "flag": 0, "message": "Error During Adding Contact Us Data", "data": {} } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedToken" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    }
+
+  },
+
+  "tags": [
+    { "name": "Auth", "description": "Registration, login, OTP, and password management" },
+    { "name": "Post", "description": "Create, view, rank, rate, comment, save, and report posts" },
+    { "name": "User", "description": "Profile, follow/unfollow, saved posts, and contact us" }
+  ]
+}
